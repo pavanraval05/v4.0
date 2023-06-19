@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity 0.8.19;
 //import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -23,17 +23,21 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 //import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
-contract YourERC721Token is ERC721URIStorage {
+contract YourERC721Token is ERC721{
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIdCounter;
 
     constructor() ERC721("YourERC721Token", "PAV") {}
 
-    function mint(address recipient, string memory tokenString) public returns (uint256) {
+
+    function mint(address recipient) public returns (uint256) {
         uint256 newTokenId = _tokenIdCounter.current();
         _mint(recipient, newTokenId);
-        _setTokenURI(newTokenId, tokenString);
+        // _setTokenURI(newTokenId, tokenString);
         _tokenIdCounter.increment();
         return newTokenId;
     }
@@ -93,16 +97,20 @@ contract NFTDutchAuction_ERC20Bids is Initializable, OwnableUpgradeable, UUPSUpg
         endsAtBlockNumber = startAtBlockNumber + numBlocksAuctionOpen;
         initialPrice = reservePrice + (numBlocksAuctionOpen * offerPriceDecrement - 1);
         auctionEnded = false;
+    
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+
 
     function getCurrentPrice() public view returns (uint256) {
         uint256 blocks = block.number - startAtBlockNumber;
         if (blocks >= numBlocksAuctionOpen) {
             return reservePrice;
         } else {
-            return initialPrice - (blocks * offerPriceDecrement);
+            return reservePrice + (numBlocksAuctionOpen - blocks - 1)*offerPriceDecrement;
         }
     }
 
@@ -120,7 +128,7 @@ contract NFTDutchAuction_ERC20Bids is Initializable, OwnableUpgradeable, UUPSUpg
         require(bidAmount >= currentPrice, "The bid amount sent is too low");
 
         require(
-            bidAmount <= erc20TokenReference.allowance(owner(), address(this)),
+            bidAmount <= erc20TokenReference.allowance(msg.sender, address(this)),
             "Bid amount accepted, but bid failed because not enough balance to transfer erc20 token"
         );
 
